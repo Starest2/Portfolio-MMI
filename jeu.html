@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html>   
+    <head>                  
+        <meta charset="UTF-8"/>
+        <link rel="stylesheet" href="https://pyscript.net/alpha/pyscript.css" />
+        <script defer src="https://pyscript.net/alpha/pyscript.js"></script> 
+        <title>Pacman</title>
+    </head>  
+    <body> 
+       <p>Voici Mon Pacman</p>
+
+        <py-script>
+            import pygame
+from time import time,sleep
+from random import randint
+
+def main():
+    """
+    fonction main() qui demande au joueur qu'elle est son nom
+    c'est elle qui définit chaque image et qui s'occupe de la boucle while
+    c'est elle qui gère si le joueur a gagné ou non et demande si il veut rejouer
+    """
+    nom = str(input("quel est votre nom d'utilisateur ? : " ))
+    charger(nom)
+    fenetre = pygame.display.set_mode((800,400))
+    pygame.init()
+    pygame.font.init()
+    img_couloir = pygame.image.load("images/couloir.png")
+    img_mur = pygame.image.load("images/mur.png")
+    img_porte = pygame.image.load("images/porte.png")
+    img_bonbon = pygame.image.load("images/bonbon.png")
+    img_superbonbon = pygame.image.load("images/superBonbon.png")
+    img_cerise = pygame.image.load("images/cerise.png")
+    img_fantome1 = pygame.image.load("images/fantome1.png")
+    img_fantome2 = pygame.image.load("images/fantome2.png")
+    img_fantome3 = pygame.image.load("images/fantome3.png")
+    img_fantome4 = pygame.image.load("images/fantome4.png")
+    img_fantomeVul = pygame.image.load("images/fantomeVul.png")
+    img_pacman = pygame.image.load("images/pacman.png")
+    fantomes = [[(20,5), False, 0],[(20,5),False,0],[(20,5),False,0],[(20,5),False,0]]
+    img_fantomes = [img_fantome1, img_fantome2, img_fantome3, img_fantome4, img_fantomeVul]
+    img_bonbons = [img_cerise, img_bonbon, img_superbonbon]
+    possibiliteesmvt = [(0,1),(0,-1),(1,0),(-1,0)]
+    Super = 0
+    pacman = (20,18)
+    vies = 2
+    score = 0
+    police = pygame.font.SysFont('Arial', 15)
+    fond = genererFond()
+    direction = (0,0)
+    combo = 1
+    
+    cerise, superBonbons, bonbons = genererBonbons(fond,pacman)
+    EVENEMENT1 = pygame.USEREVENT + 1
+    pygame.time.set_timer(EVENEMENT1, 200)
+    EVENEMENT2 = pygame.USEREVENT +2
+    pygame.time.set_timer(EVENEMENT2, 200)
+    continuer = True
+    start = False
+    
+    while continuer :
+        fenetre.fill((100,100,100))
+        afficherFond(fenetre, fond, img_mur, img_couloir, img_porte)
+        afficherBonbons(fenetre, cerise, superBonbons, bonbons, img_bonbons)
+        afficherPacMan(fenetre, pacman, img_pacman)
+        afficherScore(fenetre,score,police)
+        afficherVies(fenetre,vies,police)
+        afficherFantomes(fenetre, fantomes, img_fantomes)
+        pygame.display.flip()
+        for event in pygame.event.get():
+            if event.type == pygame.KEYDOWN :
+                start = True
+                if event.key == pygame.K_RIGHT :
+                    direction = possibiliteesmvt[3]               
+                elif event.key == pygame.K_LEFT :
+                    direction = possibiliteesmvt[2]                    
+                elif event.key == pygame.K_UP :
+                    direction = possibiliteesmvt[1]       
+                elif event.key == pygame.K_DOWN :
+                    direction = possibiliteesmvt[0]
+            if event.type == EVENEMENT1 and start == True :
+                fantomes = deplacementFantomes(fond, fantomes)
+            if event.type == EVENEMENT2:
+                pacman = deplacementPacMan(fond, pacman, direction)
+                cerise, vies = miamCerise(cerise,pacman,vies)
+                bonbons, score = miamBonbons(bonbons,pacman,score)
+                pacman,fantomes,start,score,vies,combo=miamFantomes(pacman,fantomes,start,score,vies,combo)
+                superBonbons, fantomes, Super, score = miamSuper(superBonbons, pacman,Super,fantomes,score)
+                fantomes, combo, Super = desactiveSuper(fantomes,Super,combo)
+                if vies == 0:
+                    afficherPerdu(fenetre,police)
+                    pygame.display.flip()
+                    start = False
+                    scores = enregistrer(nom, score)
+                    print("vous avez perdu")
+                    rejouer = input("voulez vous rejouer ? (oui/non) : ")
+                    if rejouer == 'oui':
+                        main()
+                    if rejouer == 'non':
+                        continuer = False
+                if bonbons == [] and vies != 0:
+                    afficherGagne(fenetre, police)
+                    pygame.display.flip()
+                    start = False
+                    scores = enregistrer(nom, score)
+                    print("vous avez gagné")
+                    rejouer = input("voulez vous rejouer ? (oui/non) :")
+                    if rejouer == 'oui':
+                        main()
+                    if rejouer == 'non':
+                        continuer = False
+            if event.type==pygame.QUIT :
+                pygame.quit()
+                continuer = False 
+                scores = enregistrer(nom, score)      
+        
+def genererFond():
+    """
+    genererFond() -> list fond
+    fonction qui lit la carte en début de partie
+    """
+    with open ("fond.txt","r") as carte :
+        mape = carte.read()
+        fond = mape.split('\n')
+        for i in range(len(fond)):
+            fond[i] = list(fond[i])
+    return (fond)
+
+def afficherFond(fenetre, fond, img_mur, img_couloir, img_porte):
+    """
+    afficheFond(fenetre, fond, img_mur, img_couloir, img_porte) -> (img)
+    fonction qui est appellée à chaque tour de frame pour afficher la carte
+    """
+    for i in range(len(fond)):
+        for j in range(len(fond[0])) :
+            if fond[i][j] == 'x':
+                fenetre.blit(img_mur,(j*20,i*20))
+            elif fond[i][j] == "o" or fond[i][j] == "j" :
+                fenetre.blit(img_couloir,(j*20,i*20))
+            elif fond[i][j] == 'p':
+                fenetre.blit(img_porte,(j*20,i*20))
+
+def afficherPacMan(fenetre, pacman, img_pacman):
+    """
+    def afficherPacMan(fenetre, pacman, img_pacman) -> (img)
+    fonction qui est appelée à chaque tour de frame pour afficher pacman
+    """
+    fenetre.blit(img_pacman,(pacman[0]*20,pacman[1]*20))
+
+def afficherBonbons(fenetre, cerise, superBonbons, bonbons, img_bonbons):
+    """
+    def afficherBonbons(fenetre, cerise, superBonbons, bonbons, img_bonbons) -> (img)
+    fonction qui est appelée à chaque tour de frale pour afficher les bonbons
+    """
+    for i in range(len(bonbons)):
+        fenetre.blit(img_bonbons[1],(bonbons[i][0]*20,bonbons[i][1]*20))
+    for elem in cerise :
+        fenetre.blit(img_bonbons[0],(cerise[0][0]*20,cerise[0][1]*20))
+    for i in range(len(superBonbons)):
+        fenetre.blit(img_bonbons[2],(superBonbons[i][0]*20,superBonbons[i][1]*20))
+
+def afficherScore(fenetre,score,police):
+    """
+    def afficherScore(fenetre,score,police) -> str
+    fonction qui est appelée à chaque tour de frame pour afficher le score
+    """
+    texte = police.render('score :'+str(score)  ,False,(255,255,255))
+    fenetre.blit(texte,(0*20,0*20))
+
+def afficherVies(fenetre,vies,police):
+    """
+    def afficherVies(fenetre,vies,police) -> str
+    fonction qui est appelée à chaque tour de frame pour afficher les vies
+    """
+    texte = police.render('vies :'+str(vies)  ,False,(255,255,255))
+    fenetre.blit(texte,(37*20,0*20))
+
+def afficherPerdu(fenetre,police):
+    """
+    def afficherPerdu(fenetre,police) -> str
+    fonction qui est appelée lorsque le joueur a perdu la partie et affiche 'GAME OVER'
+    """
+    texte = police.render('GAME OVER',False,(255,0,0))
+    fenetre.blit(texte,(19*20,9*20))
+
+def afficherGagne(fenetre, police):
+    """
+    def afficherGagne(fenetre, police) -> str
+    fonction qui est appelée lorsque le joueur a gagné la partie et affiche 'WINER'
+    """
+    texte = police.render('WINNER',False,(0,255,0))
+    fenetre.blit(texte,(19*20,9*20))
+    
+def afficherFantomes(fenetre, fantomes, img_fantomes):
+    """
+    def afficherFantomes(fenetre, fantomes, img_fantomes) -> (img)
+    fonction qui est appelée à chaque tour de frame pour afficher les fantomes
+    """
+    for i in range(len(fantomes)):
+        if fantomes[i][1] == True :
+            fenetre.blit(img_fantomes[4],(fantomes[i][0][0]*20,fantomes[i][0][1]*20))
+        else :
+            fenetre.blit(img_fantomes[i],(fantomes[i][0][0]*20,fantomes[i][0][1]*20))
+
+def deplacementFantomes(fond, fantomes):
+    """
+    deplacement Fantomes(fond, fantomes) -> list fantomes
+    fonction appelée à chaque tick d'horloge
+    elle teste pour chaque fantome si il est en prison
+    si oui elle ne déplace pas le fantome
+    si non elle le déplace au hasard et change les coordonnées de son tuple
+    """
+    prison(fantomes)
+    for i in range(len(fantomes)):
+        if fantomes[i][1] == True:
+            nouvelle1=(fantomes[i][0][0]+randint(-1,1),fantomes[i][0][1]+randint(-1,1))
+            if fond[nouvelle1[1]][nouvelle1[0]] == 'o':
+                fantomes[i][0] = nouvelle1   
+        else:
+            nouvelle=(fantomes[i][0][0]+randint(-1,1),fantomes[i][0][1]+randint(-1,1))
+            if fond[nouvelle[1]][nouvelle[0]] == 'o':
+                fantomes[i][0] = nouvelle
+    return(fantomes)
+
+def prison(fantomes):
+    """
+    prison(fanromes) -> list fantome
+    fonction qui est appelée par la fonction deplacementFantomes losqu'un fantome est en prison
+    elle compare le tick d'horloge avec la date actuelle
+    si la date de sortie est supérieur alors le fantome est libéré
+    si la date de sortie est inférieur alors le fantome reste dans la prison
+    """ 
+    for i in range(len(fantomes)):
+        if fantomes[i][2]!=0 and fantomes[i][2]<time():
+            fantomes[i] = [(20,5), False, 0]
+    return(fantomes)
+
+    def genererBonbons(fond, pacman):
+    """
+    genererBonbons(fond, pacman) -> list : cerise / superBonbons / bonbons
+    fonction appelée pour générer les liste de tous les éléments qui peuvent se récupérer par pacman
+    cette fonction est appelé au début de la partie est à chaque fois que pacman a mangé tous les bonbons
+    """
+    cerise = [(20,14)]
+    superBonbons = [(2,1),(1,14),(29,1),(29,14),(4,5)]
+    bonbons = []
+    for i in range(len(fond)):
+        for j in range(len(fond[0])):
+            if fond[i][j] == "o" :
+                bonbons.append([j,i])
+    return(cerise, superBonbons, bonbons)
+
+def deplacementPacMan(fond, pacman, direction):
+    """
+    deplacementPacMan(fond, pacman, direction) -> tuple pacman
+    fonction appelée à chaque tick d'horloge pour déplacer pacman dans la direction des paramètres donnés
+    """
+    if direction == (0,1) :
+        if fond[pacman[1]+1][pacman[0]]=='o':
+            pacman = (pacman[0],pacman[1]+1)    
+    elif direction == (0,-1):
+        if fond[pacman[1]-1][pacman[0]]=='o':
+            pacman = (pacman[0],pacman[1]-1)
+    elif direction == (1,0):
+        if fond[pacman[1]][pacman[0]-1] == 'o':
+            pacman = (pacman[0]-1,pacman[1])
+    elif direction == (-1,0):
+        if fond[pacman[1]][pacman[0]+1]=='o':
+            pacman = (pacman[0]+1,pacman[1])      
+    return(pacman)
+
+def miamCerise(cerise,pacman,vies):
+    """
+    miamCerise(cerise,pacman,vies) -> list cerise, int vies
+    fonction appelée à chaque tick d'horloge
+    elle vérifie si pacman est sur les coordonnées de la cerise
+    si oui elle lui ajoute une vie et en lève le tuple de cerise
+    """
+    if len(cerise)!=0:
+        if pacman == cerise[0]:
+            vies = vies + 1
+            cerise.remove(cerise[0])
+    return(cerise,vies)
+     
+def miamBonbons(bonbons,pacman,score):
+    """
+    miamBonbons(bonbons,pacman,score) -> list bonbons, int score
+    fonction appelée à chaque tick d'horloge
+    elle vérifie si pacman est sur un bonbon
+    si oui elle ajoute 10 points et enlève le tuple correspondant au bonbon
+    """
+    indiceB = False
+    for i in range(len(bonbons)):
+        if list(pacman) == bonbons[i]:
+            indiceB = i
+    if type(indiceB)==int:
+        bonbons.remove(bonbons[indiceB])
+        score = score + 10
+    return(bonbons,score)
+
+def miamSuper(superBonbons, pacman, Super, fantomes, score):
+    """
+    miamSuper(superBonbons, pacman, Super, fantomes, score) -> list : superBonbons / fantomes, float super, int score
+    fonction appelée à chaque tick d'horloge
+    elle vérifie si pacman est sur un superbonbon
+    si oui elle ajoute 50 point au score et rend les fantomes durant un certain temps défini par le tick d'horloge
+    """
+    indice = False
+    for i in range(len(superBonbons)):
+        if pacman == superBonbons[i]:
+            score = score + 50
+            indice = i
+    if type(indice)==int:
+        superBonbons.remove(superBonbons[indice])
+        for j in range(len(fantomes)):
+            fantomes[j][1] = True 
+        Super = time() + 10
+    return(superBonbons, fantomes,Super,score)
+
+def miamFantomes(pacman,fantomes,start,score,vies,combo):
+    """
+    miamFantomes(pacman,fantomes,start,score,vies,combo) ->  tuple pacman, list fantomes, bool start, int : score / vies / combo
+    fonction appelée à chaque tick d'horloge
+    elle vérifie si pacman est sur un fantome
+    si le fantome est vulnérable pacman le mange en envoie le fantome en prison
+    sinon pacman perd une vie et les fantomes et lui reparte à leur position de base
+    """
+    indice = False 
+    for i in range(len(fantomes)):
+        if pacman == fantomes[i][0]:
+            indice = i
+            if fantomes[indice][1] == True:
+                combo = 2
+                fantomes[indice] = [(21,8), False, time()+10]
+                score = (score + 100)*combo
+            else :
+                vies = vies - 1 
+                pacman = (20,18)
+                fantomes[i][0] = (20,5)
+                combo = 1
+                start = False
+    return(pacman,fantomes,start,score,vies,combo)
+
+def desactiveSuper(fantomes,Super,combo):
+    """
+    desactiveSuper(fantomes,Super,combo) -> list fantomes, int combo
+    focntion appelée à chaque tick d'horloge
+    c'est elle qui détermine quand le mode super doit être désactivé
+    """
+    if Super < time():
+        for i in range(len(fantomes)):
+            fantomes[i][1] = False
+            Super = 0
+            combo = 1
+    return fantomes,combo,Super
+
+def charger(nom):
+    """
+    charger(nom) -> int record
+    fonction qui vérifie si le nom entré est déjà exstant et affiche son record si le nom est déjà existant
+    """
+    with open('scores.csv', 'r') as fichier:
+        raw = fichier.read()
+    liste = raw.split('\n')
+    for i in range(len(liste)):
+        liste[i]=liste[i].split(',')
+    for utilisateur in liste :
+        if utilisateur[0]==nom :
+            return int(utilisateur[1])
+    return 0
+
+def enregistrer(nom, score):
+    """
+    enregistrer(nom, score) fonction qui enregistre le nom et le record du joueur jusqu'à ce qu'il rejoue
+    """
+    #Lecture du fichier
+    with open('scores.csv', 'r') as fichier:
+        raw = fichier.read()
+    #Mise en forme des données
+    liste = raw.split('\n')
+    for i in range(len(liste)):
+        liste[i]=liste[i].split(',')
+    #Modification des données
+    found = False
+    for utilisateur in liste :
+        if utilisateur[0]==nom :
+            found = True
+            if int(utilisateur[1])<score:
+                utilisateur[1]=str(score)
+    if not found : 
+        liste.append([nom, str(score)])
+    #Préparation des données
+    for i in range(len(liste)):
+        liste[i]=','.join(liste[i])
+    retour = '\n'.join(liste)
+    #Ecriture des données
+    with open('scores.csv','w') as fichier:
+        fichier.write(retour)
+
+        if __name__=='__main__':
+         main()
+
+        </py-script>
+    </body>
+</html>
