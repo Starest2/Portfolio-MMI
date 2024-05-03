@@ -3,6 +3,13 @@ body{background-image: url("FP.png");
 
     }
 
+div {
+        width: 80%;
+        max-width: 1000px;
+        min-width: 700px;
+  }
+      
+
 b{ font-family: arial;
   font-weight: bold;
   display: flex;
